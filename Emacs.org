@@ -337,7 +337,7 @@
 
       ("m" "Metrics Capture")
       ("mw" "Weight" table-line (file+headline "~/Documents/OrgFiles/Metrics.org" "Weight")
-       "| %U | %^{Weight} | %^{Notes} |" :kill-buffer t))))
+       "| %U | %^{Weight} | %^{Notes} |" :kill-buffer t)))
 
 
 
