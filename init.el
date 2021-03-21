@@ -34,11 +34,38 @@
 (column-number-mode)
 (global-display-line-numbers-mode t)
 
-(set-face-attribute 'default nil :font "Fira Code" :height barremacs/default-font-size)
+(setq truncate-lines 1)
 
-(set-face-attribute 'fixed-pitch nil :font "Fira Code" :height barremacs/default-font-size)
+(defun barremacs/set-font-faces ()
+  (message "Setting faces")
+  (set-face-attribute 'default nil :font "Fira Code" :height barremacs/default-font-size)
 
-(set-face-attribute 'variable-pitch nil :font "Cantarell" :height barremacs/var-pitch-font-size)
+  (set-face-attribute 'fixed-pitch nil :font "Fira Code" :height barremacs/default-font-size)
+
+  (set-face-attribute 'variable-pitch nil :font "Cantarell" :height barremacs/var-pitch-font-size))
+
+(if (daemonp)
+    (add-hook 'after-make-frame-functions
+              (lambda (frame)
+                (setq doom-modeline-icon t)
+                (with-selected-frame frame
+                  (barremacs/set-font-faces))))
+    (barremacs/set-font-faces))
+
+; (use-package simple-httpd)
+
+; (add-to-list 'load-path "/home/barre/BSE/")
+; (require 'spotify)
+
+;; Settings
+; (setq spotify-oauth2-client-secret "230474a9a95446dd99bf6a6570e2aa8f")
+; (setq spotify-oauth2-client-id "734b1bd830d74e5e9f761cc8b5e849d1")
+; (define-key spotify-mode-map (kbd "C-c .") 'spotify-command-map)
+; (setq spotify-transport 'connect)
+
+(use-package counsel-spotify)
+(setq counsel-spotify-client-id "734b1bd830d74e5e9f761cc8b5e849d1")
+(setq counsel-spotify-client-secret "230474a9a95446dd99bf6a6570e2aa8f")
 
 (use-package general
   :config
@@ -50,28 +77,45 @@
   (general-define-key
    "C-M-j" 'counsel-switch-buffer
    "C-M-," 'magit-status
-   "C-M-k" 'kill-buffer)
-  
+   "C-M-k" 'kill-buffer-and-window
+   "C-c a" 'org-agenda)  
+
   (barremacs/leader-keys
+    "c"  '(:ignore c :which-key "code")
+    "cc" '(comment-or-uncomment-region :which-key "comment") 
+    "cs" '(lsp-treemacs-symbols :which-key "treemacs-symbols")
+    "ct" '(treemacs :which-key "treemacs")
+    "cr" '(lsp-treemacs-references :which-key "references")
     "t"  '(:ignore t :which-key "toggles")
-    "tt" '(counsel-load-theme :which-key "choose theme")))
+    "tt" '(counsel-load-theme :which-key "choose theme")
+     "s"  '(:ignore s :which-key "spotify")
+     "sn" '(counsel-spotify-next :which-key "next")
+     "sp" '(counsel-spotify-previous :which-key "previous")      
+     "ss" '(counsel-spotify-search-track :which-key "search track")
+     "sa" '(counsel-spotify-search-album :which-key "search album")
+     "st" '(counsel-spotify-toggle-play-pause :which-key "play/pause")))
 
 (use-package command-log-mode)
 
-(use-package hydra)
+(use-package doom-themes
+  :init (load-theme 'doom-gruvbox t))
 
-(defhydra hydra-text-scale (:timeout 4)
-  "scale text"
-  ("j" text-scale-increase "in")
-  ("k" text-scale-decrease "out")
-  ("f" nil "finished" :exit t))
+(use-package all-the-icons)
 
-(barremacs/leader-keys
-    "ts" '(hydra-text-scale/body :which-key "scale text"))
+(use-package doom-modeline
+  :init (doom-modeline-mode 1)
+  :custom ((doom-modeline-height 15)))
+
+(use-package which-key
+  :init (which-key-mode)
+  :diminish which-key-mode
+  :config
+  (setq which-key-idle-delay 1))
 
 (dolist (mode '(org-mode-hook
                 term-mode-hook
                 shell-mode-hook
+                treemacs-mode-hook
                 eshell-mode-hook))
   (add-hook mode (lambda () (display-line-numbers-mode 0))))
 
@@ -101,23 +145,11 @@
 ;;
 ;; M-x all-the-icons-install-fonts
 
-(use-package all-the-icons)
 
-(use-package doom-modeline
-  :init (doom-modeline-mode 1)
-  :custom ((doom-modeline-height 15)))
 
-(use-package doom-themes
-  :init (load-theme 'doom-gruvbox t))
 
-(use-package rainbow-delimiters
-  :hook (prog-mode . rainbow-delimiters-mode))
 
-(use-package which-key
-  :init (which-key-mode)
-  :diminish which-key-mode
-  :config
-  (setq which-key-idle-delay 1))
+
 
 
 
@@ -142,18 +174,55 @@
   ([remap describe-variable] . counsel-describe-variable)
   ([remap describe-key] . helpful-key))
 
-(defun barremacs/org-mode-setup()
+(use-package hydra)
+
+(defhydra hydra-text-scale (:timeout 4)
+  "scale text"
+  ("j" text-scale-increase "in")
+  ("k" text-scale-decrease "out")
+  ("f" nil "finished" :exit t))
+
+(barremacs/leader-keys
+    "ts" '(hydra-text-scale/body :which-key "scale text"))
+
+(defun barremacs/org-font-setup ()
+  ;; Replaces list hyphen with a dot
+  (font-lock-add-keywords 'org-mode
+		      '(("^ *\\([-]\\)"
+			 (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
+
+  ;;Set faces for heading levels
+  (dolist (face '((org-level-1 . 1.2)
+                  (org-level-2 . 1.1)
+		  (org-level-3 . 1.05)
+		  (org-level-4 . 1.0)
+		  (org-level-5 . 1.1)
+		  (org-level-6 . 1.1)
+		  (org-level-7 . 1.1)
+		  (org-level-8 . 1.1)))
+      (set-face-attribute (car face) nil :font "Cantarell" :weight 'regular :height (cdr face)))
+
+
+ ;;Ensure that anything that should be fixed pitch in org files appears that way
+ (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
+ (set-face-attribute 'org-code nil :inherit '(shadow fixed-pitch))
+ (set-face-attribute 'org-table nil :inherit '(shadow fixed-pitch))
+
+ (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
+ (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
+ (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
+ (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch))
+
+(defun barremacs/org-mode-setup () 
   (org-indent-mode)
   (variable-pitch-mode 1)
   (visual-line-mode 1))
    
 
-(font-lock-add-keywords 'org-mode
-			 '(("^ *\\([-]\\)"
-			    (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
 
 (use-package org
-  :config  
+  :hook (org-mode . barremacs/org-mode-setup)  
+  :config
   (setq org-ellipsis " ▾"
 	org-hide-emphasis-markers t)
 
@@ -166,7 +235,7 @@
 
   (require 'org-habit)
   (add-to-list 'org-modules 'org-habit)
-  (setq org-habit-graph-column 69)
+  (setq org-habit-graph-column 60)
   
   
   (setq org-tag-alist
@@ -240,7 +309,7 @@
              (org-agenda-files org-agenda-files)))
       (todo "CANC"
             ((org-agenda-overriding-header "Cancelled Projects")
-             (org-agenda-files org-agenda-files))))))))
+             (org-agenda-files org-agenda-files)))))))
 
 
   (setq org-capture-templates
@@ -269,39 +338,13 @@
       ("mw" "Weight" table-line (file+headline "~/Documents/OrgFiles/Metrics.org" "Weight")
        "| %U | %^{Weight} | %^{Notes} |" :kill-buffer t)))
 
-
+      (barremacs/org-font-setup))
 
 (use-package org-bullets
-  :after org
-  :hook (org-mode . org-bullets-mode)
-  :custom
-  (org-bullets-bullet-list '("◉" "○" "●" "○" "●" "○" "●")))
-
-
-
-
-(dolist (face '((org-level-1 . 1.2)
-		(org-level-2 . 1.1)
-		(org-level-3 . 1.05)
-		(org-level-4 . 1.0)
-		(org-level-5 . 1.1)
-		(org-level-6 . 1.1)
-		(org-level-7 . 1.1)
-		(org-level-8 . 1.1)))
-  (set-face-attribute (car face) nil :font "Cantarell" :weight 'regular :height (cdr face)))
-
-
-
-(set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
-(set-face-attribute 'org-code nil :inherit '(shadow fixed-pitch))
-(set-face-attribute 'org-table nil :inherit '(shadow fixed-pitch))
-;;(
-(set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
-(set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
-(set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
-(set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch)
-
-
+    :after org
+    :hook (org-mode . org-bullets-mode)
+    :custom
+    (org-bullets-bullet-list '("◉" "○" "●" "○" "●" "○" "●")))
 
 (defun barremacs/org-mode-visual-fill ()
   (setq visual-fill-column-width 100
@@ -319,6 +362,12 @@
 
 (push '("conf-unix" . conf-unix) org-src-lang-modes)
 
+(require 'org-tempo)
+
+(add-to-list 'org-structure-template-alist '("sh" . "src shell"))
+(add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
+(add-to-list 'org-structure-template-alist '("py" . "src python"))
+
 ;;Automatically tangle Emacs.org config file when saved
 
 (defun barremacs/org-babel-tangle-config ()
@@ -331,15 +380,55 @@
 
 (add-hook 'org-mode-hook (lambda () (add-hook 'after-save-hook #'barremacs/org-babel-tangle-config)))
 
-(use-package magit
-  :custom
-  (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1))
+(use-package yasnippet)
+(use-package yasnippet-snippets)
+(yas-global-mode 1)
 
-  
-;; NOTE: Make sure to configure a GitHub token before using this package!
-;; - https://magit.vc/manual/forge/Token-Creation.html#Token-Creation
-;; - https://magit.vc/manual/ghub/Getting-Started.html#Getting-Started
-(use-package forge)
+(defun barremacs/lsp-mode-setup ()
+  (setq lsp-headerline-breadcrumb-segments '(path-up-to-project file symbolds))
+  (lsp-headerline-breadcrumb-mode))
+
+(use-package lsp-mode 
+  :commands (lsp lsp-deferred)
+  :init
+  (setq lsp-keymap-prefix "C-c l")
+  :config
+  (lsp-enable-which-key-integration t)
+;;   (lsp-enable-snippet t)
+)
+
+(use-package lsp-ui
+  :hook (lsp-mode . lsp-ui-mode)
+  :custom
+  (lsp-ui-doc-position 'bottom))
+
+(use-package lsp-treemacs
+  :after lsp)
+
+(use-package csharp-mode
+  :mode "\\.cs\\'"
+  :hook (csharp-mode . lsp-deferred))
+
+(use-package js2-mode
+  :mode "\\.js\\'"
+  :hook (js2-mode . lsp-deferred))
+
+(use-package web-mode
+  :mode "\\.html\\'"
+  :hook (web-mode . lsp-deferred))
+
+;(add-hook 'html-mode 'lsp-deferred)
+
+(use-package css-mode
+  :mode "\\.css\\'"
+  :hook (css-mode . lsp-deferred))
+
+(use-package lsp-python-ms
+  :ensure t
+  :init (setq lsp-python-ms-auto-install-server t)
+  :hook (python-mode . (lambda ()
+                          (require 'lsp-python-ms)
+                          (lsp))))  ; or lsp-deferred
 
 (use-package projectile
   :diminish projectile-mode
@@ -355,6 +444,65 @@
 
 (use-package counsel-projectile
   :config (counsel-projectile-mode))
+
+(defun barremacs/expand-with-company ()
+   (interactive)
+   (call-interactively 'company-complete-selection)
+   (call-interactively 'yas-expand))
+
+(use-package company
+  :after lsp-mode
+  :hook (lsp-mode . company-mode)
+        (lsp-mode . yas-minor-mode)
+  :bind (:map company-active-map
+         ("<tab>" .  barremacs/expand-with-company))
+        (:map lsp-mode-map
+         ("<tab>" . company-indent-or-complete-common))
+  :custom
+  (company-minimum-prefix-length 1)
+  (company-idle-delay 0.0))
+
+(use-package company-box
+  :hook (company-mode . company-box-mode))
+
+(use-package magit
+  :custom
+  (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1))
+
+  
+;; NOTE: Make sure to configure a GitHub token before using this package!
+;; - https://magit.vc/manual/forge/Token-Creation.html#Token-Creation
+;; - https://magit.vc/manual/ghub/Getting-Started.html#Getting-Started
+(use-package forge)
+
+(use-package rainbow-delimiters
+  :hook (prog-mode . rainbow-delimiters-mode))
+
+(use-package term
+  :config
+  (setq explicit-shell-file-name "bash")
+  (setq term-prompt-regexp "^[^#$%>\n]*[#$%>] *"))
+
+(use-package dired
+  :ensure nil
+  :commands (dired dired-jump)
+  :bind (("C-x C-j" . dired-jump))
+  :custom ((dired-listing-switches "-agho --group-directories-first"))
+  :config
+  (define-key dired-mode-map (kbd "C-b") 'dired-single-up-directory)
+  (define-key dired-mode-map (kbd "C-f") 'dired-single-buffer)
+  (define-key dired-mode-map (kbd "RET") 'dired-single-buffer))
+
+
+(use-package dired-single)
+
+(use-package all-the-icons-dired
+  :hook (dired-mode . all-the-icons-dired-mode))
+
+(use-package dired-hide-dotfiles
+  :hook (dired-mode . dired-hide-dotfiles-mode)
+  :config 
+  (define-key dired-mode-map (kbd "H") 'dired-hide-dotfiles-mode))
 
 ;; Make ESC quit prompts
 

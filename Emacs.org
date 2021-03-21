@@ -61,12 +61,24 @@ Configures basic UI elements such as font size, removing the menu bar, et.c.
 Configures Fira Code font for monospace and Cantarell for Variable Pitch font size (For Org mode et.al).
 
    #+begin_src emacs-lisp
-      
-   (set-face-attribute 'default nil :font "Fira Code" :height barremacs/default-font-size)
+   
+   (defun barremacs/set-font-faces ()
+     (message "Setting faces")
+     (set-face-attribute 'default nil :font "Fira Code" :height barremacs/default-font-size)
 
-   (set-face-attribute 'fixed-pitch nil :font "Fira Code" :height barremacs/default-font-size)
+     (set-face-attribute 'fixed-pitch nil :font "Fira Code" :height barremacs/default-font-size)
 
-   (set-face-attribute 'variable-pitch nil :font "Cantarell" :height barremacs/var-pitch-font-size)
+     (set-face-attribute 'variable-pitch nil :font "Cantarell" :height barremacs/var-pitch-font-size))
+
+   (if (daemonp)
+       (add-hook 'after-make-frame-functions
+                 (lambda (frame)
+                   (setq doom-modeline-icon t)
+                   (with-selected-frame frame
+                     (barremacs/set-font-faces))))
+       (barremacs/set-font-faces))
+
+
 
    #+end_src
 
@@ -698,6 +710,7 @@ Useful for programming, show parathesises with different colors.
 
 * Terminals
 ** Term
+ 
 #+begin_src emacs-lisp
 
 (use-package term
@@ -715,7 +728,12 @@ Useful for programming, show parathesises with different colors.
   :ensure nil
   :commands (dired dired-jump)
   :bind (("C-x C-j" . dired-jump))
-  :custom ((dired-listing-switches "-agho --group-directories-first")))  
+  :custom ((dired-listing-switches "-agho --group-directories-first"))
+  :config
+  (define-key dired-mode-map (kbd "C-b") 'dired-single-up-directory)
+  (define-key dired-mode-map (kbd "C-f") 'dired-single-buffer)
+  (define-key dired-mode-map (kbd "RET") 'dired-single-buffer))
+
 
 (use-package dired-single)
 
@@ -724,7 +742,7 @@ Useful for programming, show parathesises with different colors.
 
 (use-package dired-hide-dotfiles
   :hook (dired-mode . dired-hide-dotfiles-mode)
-  :config
+  :config 
   (define-key dired-mode-map (kbd "H") 'dired-hide-dotfiles-mode))
 
 #+end_src
